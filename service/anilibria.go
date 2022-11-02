@@ -1,0 +1,52 @@
+package service
+
+import (
+	"context"
+	"pervaki/anilibria"
+	"pervaki/anilibria/model"
+	serviceModel "pervaki/model"
+
+	"go.uber.org/zap"
+)
+
+type AnilibriaRepo interface {
+	Upsert(ctx context.Context, title serviceModel.Title) error
+	SelectAll() ([]model.Title, error)
+	UpsertThroughBuilder(ctx context.Context, title serviceModel.Title) error
+}
+
+type AnilibriaService struct {
+	logger        *zap.SugaredLogger
+	cli           anilibria.Client
+	anilibriaRepo AnilibriaRepo
+}
+
+func NewAnilibriaService(logger *zap.SugaredLogger, cli anilibria.Client, anilibriaRepo AnilibriaRepo) AnilibriaService {
+	return AnilibriaService{
+		logger:        logger,
+		cli:           cli,
+		anilibriaRepo: anilibriaRepo,
+	}
+}
+
+func (s AnilibriaService) GetTitleName(ctx context.Context, code string) (string, error) {
+	title, err := s.cli.GetTitle(ctx, model.GetTitleFilter{Code: code})
+	if err != nil {
+		return "", err
+	}
+	err = s.anilibriaRepo.UpsertThroughBuilder(ctx, title)
+	if err != nil {
+		return "", err
+	}
+
+	return title.NameRu, nil
+}
+func (s AnilibriaService) GetTitles(ctx context.Context) ([]model.Title, error) {
+
+	titles, err := s.anilibriaRepo.SelectAll()
+	if err != nil {
+		return titles, err
+	}
+
+	return titles, nil
+}
